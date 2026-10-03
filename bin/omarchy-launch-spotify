@@ -20,7 +20,9 @@ spotify_flags() {
   '
 }
 
-WINDOW_ADDRESS=$(hyprctl clients -j | jq -r '.[]|select((.class|test("\\bspotify\\b";"i")) or (.title|test("\\bspotify\\b";"i")))|.address' | head -n1)
+# Match by class; the title only identifies Spotify while it has none, since a file manager
+# or browser tab can just as well be titled after it.
+WINDOW_ADDRESS=$(hyprctl clients -j | jq -r '.[]|select((.class|test("^spotify$";"i")) or (.class == "" and (.title|test("\\bspotify\\b";"i"))))|.address' | head -n1)
 
 if [[ -n $WINDOW_ADDRESS && -z $1 ]]; then
   hyprctl dispatch "hl.dsp.focus({ window = \"address:$WINDOW_ADDRESS\" })" >/dev/null 2>&1 || hyprctl dispatch focuswindow "address:$WINDOW_ADDRESS"

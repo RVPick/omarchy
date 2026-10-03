@@ -69,3 +69,6 @@ actual=$(WIDTH=1920 HEIGHT=1080 SCALE=1.25 CLIENTS='[{"class":"spotify","title":
 [[ -z $actual ]] && grep -q 'address:0xabc' "$test_dir/dispatch.log" || fail "a running Spotify is focused instead of relaunched" "$actual"
 pass "a running Spotify is focused instead of relaunched"
 
+actual=$(WIDTH=2560 HEIGHT=1440 SCALE=1 CLIENTS='[{"class":"org.gnome.Nautilus","title":"spotify-screenshots","address":"0xdef"}]' launch)
+[[ $actual == "--ozone-platform=wayland" ]] || fail "a window merely titled after Spotify does not count as Spotify" "$actual"
+pass "a window merely titled after Spotify does not count as Spotify"
