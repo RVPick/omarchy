@@ -40,7 +40,9 @@ cat >"$tmp_dir/bin/pacman" <<'SCRIPT'
 #!/bin/bash
 if [[ $1 == "-Qqo" && $2 == */native.desktop ]]; then
   printf 'native-pkg\n'
-elif [[ $1 == "-Qqo" && $2 == */system/applications/spotify.desktop ]]; then
+elif [[ $1 == "-Qqo" && $2 == */system/applications/firefox.desktop ]]; then
+  printf 'firefox\n'
+elif [[ $1 == "-Qq" && $2 == "spotify" ]]; then
   printf 'spotify\n'
 else
   exit 1
@@ -72,12 +74,11 @@ Name=Aliens
 Exec=retroarch -L /usr/lib/libretro/fbneo_libretro.so /home/example/Games/roms/fbneo/aliens.zip
 DESKTOP
 
-# User overrides of packaged entries: Spotify's is owned by a package, the
-# other shadows an entry nothing owns.
-for name in spotify unowned; do
-  printf '[Desktop Entry]\nName=%s\nExec=%s\n' "$name" "$name" >"$tmp_dir/system/applications/$name.desktop"
-  printf '[Desktop Entry]\nName=%s\nExec=omarchy-launch-%s\n' "$name" "$name" >"$tmp_dir/data/applications/$name.desktop"
-done
+# An Omarchy launcher wrapper names the package it fronts; a user's own launcher
+# that happens to share a packaged app's desktop ID does not.
+printf '[Desktop Entry]\nName=Spotify\nExec=omarchy-launch-spotify %%u\nX-Omarchy-Package=spotify\n' >"$tmp_dir/data/applications/spotify.desktop"
+printf '[Desktop Entry]\nName=Firefox\nExec=firefox\n' >"$tmp_dir/system/applications/firefox.desktop"
+printf '[Desktop Entry]\nName=Private Firefox\nExec=firefox --private-window\n' >"$tmp_dir/data/applications/firefox.desktop"
 
 export TEST_LOG="$tmp_dir/log"
 export PATH="$tmp_dir/bin:$PATH"
@@ -89,7 +90,7 @@ export XDG_DATA_DIRS="$tmp_dir/system"
 "$ROOT/bin/omarchy-remove-launcher-entry" native.desktop Native
 "$ROOT/bin/omarchy-remove-launcher-entry" aliens.desktop Aliens
 "$ROOT/bin/omarchy-remove-launcher-entry" spotify.desktop Spotify
-"$ROOT/bin/omarchy-remove-launcher-entry" unowned.desktop Unowned
+"$ROOT/bin/omarchy-remove-launcher-entry" firefox.desktop "Private Firefox"
 
 mapfile -t lines <"$TEST_LOG"
 
@@ -105,14 +106,26 @@ pass "launcher remove opens package uninstall flow"
 [[ ! -e $tmp_dir/data/applications/aliens.desktop ]] || fail "launcher remove deletes user-owned desktop files"
 pass "launcher remove deletes user-owned desktop files"
 
-[[ ${lines[3]:-} == "terminal::echo Uninstalling Spotify...; sudo pacman -Rns spotify" ]] || fail "launcher remove uninstalls the package behind a user override" "${lines[3]:-}"
-pass "launcher remove uninstalls the package behind a user override"
+spotify_entry="$tmp_dir/data/applications/spotify.desktop"
+uninstall="echo Uninstalling Spotify...; sudo pacman -Rns spotify && rm -f $spotify_entry && { update-desktop-database $tmp_dir/data/applications &>/dev/null || true; }"
+[[ ${lines[3]:-} == "terminal::$uninstall" ]] || fail "launcher remove uninstalls the package an Omarchy wrapper names" "${lines[3]:-}"
+pass "launcher remove uninstalls the package an Omarchy wrapper names"
 
-[[ ! -e $tmp_dir/data/applications/spotify.desktop ]] || fail "launcher remove deletes the user override of a packaged entry"
-pass "launcher remove deletes the user override of a packaged entry"
+[[ -e $spotify_entry ]] || fail "launcher remove keeps the wrapper until the uninstall succeeds"
+pass "launcher remove keeps the wrapper until the uninstall succeeds"
 
-[[ ! -e $tmp_dir/data/applications/unowned.desktop && -e $tmp_dir/system/applications/unowned.desktop ]] || fail "launcher remove only deletes the override of an entry no package owns"
-pass "launcher remove only deletes the override of an entry no package owns"
+# Run the uninstall the terminal would run, once failing and once succeeding.
+printf '#!/bin/bash\nexit "${SUDO_STATUS:-0}"\n' >"$tmp_dir/bin/sudo"
+chmod +x "$tmp_dir/bin/sudo"
+SUDO_STATUS=1 bash -c "$uninstall" >/dev/null || true
+[[ -e $spotify_entry ]] || fail "a cancelled uninstall leaves the wrapper in place"
+pass "a cancelled uninstall leaves the wrapper in place"
+SUDO_STATUS=0 bash -c "$uninstall" >/dev/null
+[[ ! -e $spotify_entry ]] || fail "a finished uninstall removes the wrapper"
+pass "a finished uninstall removes the wrapper"
+
+[[ ! -e $tmp_dir/data/applications/firefox.desktop && -e $tmp_dir/system/applications/firefox.desktop ]] || fail "launcher remove only deletes a user launcher that shares a packaged app's ID"
+pass "launcher remove only deletes a user launcher that shares a packaged app's ID"
 
 (( ${#lines[@]} == 4 )) || fail "launcher remove does not notify for user-owned desktop files" "$(printf '%s\n' "${lines[@]}")"
 pass "launcher remove does not notify for user-owned desktop files"
