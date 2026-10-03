@@ -37,8 +37,10 @@ exec "$@"
 STUB
 chmod +x "$test_dir/bin/"*
 
+mkdir -p "$test_dir/home/.config"
+
 launch() {
-  PATH="$test_dir/bin:$PATH" DISPATCH_LOG="$test_dir/dispatch.log" bash "$test_dir/launch" "$@"
+  HOME="$test_dir/home" XDG_CONFIG_HOME="${XDG_CONFIG_HOME_OVERRIDE:-}" PATH="$test_dir/bin:$PATH" DISPATCH_LOG="$test_dir/dispatch.log" bash "$test_dir/launch" "$@"
 }
 
 expect_flags() {
@@ -60,6 +62,19 @@ expect_flags "1920 1080 2" "$wayland"$'\n--force-device-scale-factor=0.48' "a 10
 expect_flags "2560 1600 1.6" "$wayland"$'\n--force-device-scale-factor=0.8' "a 2560px monitor at 1.6x fits Spotify in a half tile"
 expect_flags "2560 1440 1" "$wayland" "a 1440p monitor at 1x leaves Spotify at its own scale"
 expect_flags "1920 1080 1 1" "$wayland"$'\n--force-device-scale-factor=0.54' "a portrait monitor measures its rotated width"
+
+# A scale the user set in their own Spotify flags wins, since Spotify's
+# launcher already passes it along; a commented-out one does not count.
+printf -- '--force-device-scale-factor=1\n' >"$test_dir/home/.config/spotify-flags.conf"
+expect_flags "1920 1080 1.25" "$wayland" "a scale in the user's Spotify flags replaces the half-tile fit"
+
+printf -- '# --force-device-scale-factor=1\n' >"$test_dir/home/.config/spotify-flags.conf"
+expect_flags "1920 1080 1.25" "$wayland"$'\n--force-device-scale-factor=0.768' "a commented-out scale in the user's Spotify flags is ignored"
+rm "$test_dir/home/.config/spotify-flags.conf"
+
+mkdir -p "$test_dir/xdg"
+printf -- '--force-device-scale-factor=1\n' >"$test_dir/xdg/spotify-flags.conf"
+XDG_CONFIG_HOME_OVERRIDE="$test_dir/xdg" expect_flags "1920 1080 1.25" "$wayland" "the user's Spotify flags are read from XDG_CONFIG_HOME"
 
 actual=$(WIDTH=2560 HEIGHT=1440 SCALE=1 launch spotify:track:abc)
 [[ $actual == $'--ozone-platform=wayland\n--uri=spotify:track:abc' ]] || fail "a spotify: link is handed to Spotify" "$actual"

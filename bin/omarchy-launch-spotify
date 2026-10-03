@@ -9,9 +9,18 @@ set -e
 # Under Wayland its layout needs about 960 of its own pixels across (with the now-playing
 # panel open) before controls fall off the right edge. Size it to 1000, leaving room for the
 # scroll bar and gaps, so it fits a half-width tile on the focused monitor; where a half tile
-# is already that wide, leave it at the monitor's own scale.
+# is already that wide, leave it at the monitor's own scale. The scale is fixed for the whole
+# session, so anyone who keeps Spotify full-width can set their own in spotify-flags.conf
+# (1 keeps the monitor's scale), which Spotify's launcher passes along and this then defers to.
 spotify_flags() {
+  local user_flags="${XDG_CONFIG_HOME:-$HOME/.config}/spotify-flags.conf"
+
   echo --ozone-platform=wayland
+
+  if [[ -f $user_flags ]] && grep -q -- '^--force-device-scale-factor=' "$user_flags"; then
+    return
+  fi
+
   hyprctl monitors -j | jq -r '
     .[] | select(.focused)
     | ((if .transform % 2 == 1 then .height else .width end) / .scale / 2 / 1000) as $fit
