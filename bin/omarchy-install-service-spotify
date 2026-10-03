@@ -8,10 +8,13 @@ set -e
 echo "Installing Spotify..."
 omarchy-pkg-add spotify
 
-# Route the app launcher and spotify: links through omarchy-launch-spotify for native Wayland rendering
-mkdir -p ~/.local/share/applications
-install -m 644 "$OMARCHY_PATH/default/applications/spotify.desktop" ~/.local/share/applications/spotify.desktop
-update-desktop-database ~/.local/share/applications 2>/dev/null || true
+# Route the app launcher and spotify: links through omarchy-launch-spotify for native Wayland
+# rendering, leaving a launcher entry the user wrote themselves alone
+if [[ ! -f ~/.local/share/applications/spotify.desktop ]]; then
+  mkdir -p ~/.local/share/applications
+  install -m 644 "$OMARCHY_PATH/default/applications/spotify.desktop" ~/.local/share/applications/spotify.desktop
+  update-desktop-database ~/.local/share/applications 2>/dev/null || true
+fi
 
 echo "Opening Spotify..."
 omarchy-launch-spotify >/dev/null 2>&1 &
