@@ -1,15 +1,33 @@
 #!/bin/bash
 
 # omarchy:summary=Launch Spotify or start its installer when missing.
+# omarchy:args=[spotify-uri]
 
 set -e
 
+# Spotify's bundled Chromium falls back to XWayland, where its video player renders blank.
+# Under Wayland its layout needs about 960 of its own pixels across (with the now-playing
+# panel open) before controls fall off the right edge. Size it to 1000, leaving room for the
+# scroll bar and gaps, so it fits a half-width tile on the focused monitor; where a half tile
+# is already that wide, leave it at the monitor's own scale.
+spotify_flags() {
+  echo --ozone-platform=wayland
+  hyprctl monitors -j | jq -r '
+    .[] | select(.focused)
+    | ((if .transform % 2 == 1 then .height else .width end) / .scale / 2 / 1000) as $fit
+    | select($fit < 1)
+    | "--force-device-scale-factor=\($fit * 10000 | floor / 10000)"
+  '
+}
+
 WINDOW_ADDRESS=$(hyprctl clients -j | jq -r '.[]|select((.class|test("\\bspotify\\b";"i")) or (.title|test("\\bspotify\\b";"i")))|.address' | head -n1)
 
-if [[ -n $WINDOW_ADDRESS ]]; then
+if [[ -n $WINDOW_ADDRESS && -z $1 ]]; then
   hyprctl dispatch "hl.dsp.focus({ window = \"address:$WINDOW_ADDRESS\" })" >/dev/null 2>&1 || hyprctl dispatch focuswindow "address:$WINDOW_ADDRESS"
 elif [[ -x /usr/bin/spotify ]]; then
-  exec setsid uwsm-app -- /usr/bin/spotify
+  mapfile -t flags < <(spotify_flags)
+  [[ -n $1 ]] && flags+=("--uri=$1")
+  exec setsid uwsm-app -- /usr/bin/spotify "${flags[@]}"
 else
   exec omarchy-launch-floating-terminal-with-presentation omarchy-install-service-spotify
 fi

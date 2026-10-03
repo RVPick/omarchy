@@ -8,11 +8,13 @@ set -e
 echo "Installing Spotify..."
 omarchy-pkg-add spotify
 
-mkdir -p ~/.config
-cp -f "$OMARCHY_PATH/config/spotify-flags.conf" ~/.config/spotify-flags.conf
+# Route the app launcher and spotify: links through omarchy-launch-spotify for native Wayland rendering
+mkdir -p ~/.local/share/applications
+install -m 644 "$OMARCHY_PATH/default/applications/spotify.desktop" ~/.local/share/applications/spotify.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 echo "Opening Spotify..."
-setsid uwsm-app -- /usr/bin/spotify >/dev/null 2>&1 &
+omarchy-launch-spotify >/dev/null 2>&1 &
 
 echo ""
 echo "Spotify has been installed."
