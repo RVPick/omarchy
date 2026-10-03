@@ -30,6 +30,9 @@ elif [[ -x /usr/bin/spotify ]]; then
   mapfile -t flags < <(spotify_flags)
   [[ -n $1 ]] && flags+=("--uri=$1")
   exec setsid uwsm-app -- /usr/bin/spotify "${flags[@]}"
+elif [[ -n $1 ]]; then
+  # The installer runs as a shell command line, and the link may come from a web page
+  exec omarchy-launch-floating-terminal-with-presentation "omarchy-install-service-spotify $(printf '%q' "$1")"
 else
   exec omarchy-launch-floating-terminal-with-presentation omarchy-install-service-spotify
 fi

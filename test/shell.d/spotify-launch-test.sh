@@ -72,3 +72,31 @@ pass "a running Spotify is focused instead of relaunched"
 actual=$(WIDTH=2560 HEIGHT=1440 SCALE=1 CLIENTS='[{"class":"org.gnome.Nautilus","title":"spotify-screenshots","address":"0xdef"}]' launch)
 [[ $actual == "--ozone-platform=wayland" ]] || fail "a window merely titled after Spotify does not count as Spotify" "$actual"
 pass "a window merely titled after Spotify does not count as Spotify"
+
+# Without Spotify, a link must survive the trip through the installer's shell
+# command line intact, without any part of it running as a command.
+sed "s|/usr/bin/spotify|$test_dir/missing/spotify|g" "$ROOT/bin/omarchy-launch-spotify" >"$test_dir/launch-missing"
+cat >"$test_dir/bin/omarchy-launch-floating-terminal-with-presentation" <<'STUB'
+#!/bin/bash
+bash -c "$*"
+STUB
+cat >"$test_dir/bin/omarchy-install-service-spotify" <<'STUB'
+#!/bin/bash
+printf '%s|' "$#" "$@" >"$INSTALL_LOG"
+STUB
+chmod +x "$test_dir/bin/omarchy-launch-floating-terminal-with-presentation" "$test_dir/bin/omarchy-install-service-spotify"
+
+install_with() {
+  rm -f "$test_dir/install.log"
+  (cd "$test_dir" && HOME="$test_dir" PATH="$test_dir/bin:$PATH" INSTALL_LOG="$test_dir/install.log" CLIENTS='[]' bash "$test_dir/launch-missing" "$@")
+}
+
+link='spotify:track:abc;touch "$HOME/pwned" $(touch pwned2)'
+install_with "$link"
+[[ $(<"$test_dir/install.log") == "1|$link|" ]] || fail "a spotify: link is handed to the installer intact" "$(<"$test_dir/install.log")"
+[[ ! -e $test_dir/pwned && ! -e $test_dir/pwned2 ]] || fail "a spotify: link is never run as a command"
+pass "a spotify: link is handed to the installer intact"
+
+install_with
+[[ $(<"$test_dir/install.log") == "0|" ]] || fail "the installer starts without a link when none is given" "$(<"$test_dir/install.log")"
+pass "the installer starts without a link when none is given"

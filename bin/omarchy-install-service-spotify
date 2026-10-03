@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # omarchy:summary=Install Spotify.
+# omarchy:args=[spotify-uri]
 # omarchy:requires-sudo=true
 
 set -e
@@ -17,7 +18,7 @@ if [[ ! -f ~/.local/share/applications/spotify.desktop ]]; then
 fi
 
 echo "Opening Spotify..."
-omarchy-launch-spotify >/dev/null 2>&1 &
+omarchy-launch-spotify "$@" >/dev/null 2>&1 &
 
 echo ""
 echo "Spotify has been installed."
