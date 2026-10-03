@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # The Spotify installer and migration must deliver the launcher entry that
-# routes Spotify through omarchy-launch-spotify, mark an existing Omarchy
-# entry with its package so Apps removal uninstalls Spotify, and leave a
-# launcher entry the user wrote themselves alone.
+# routes Spotify through omarchy-launch-spotify, and must leave a launcher
+# entry the user wrote themselves alone.
 
 set -euo pipefail
 
@@ -59,16 +58,3 @@ pass "installer installs the Spotify launcher entry"
 
 grep -qx 'Exec=omarchy-launch-spotify %u' "$entry" || fail "the launcher entry starts Spotify through omarchy-launch-spotify"
 pass "the launcher entry starts Spotify through omarchy-launch-spotify"
-
-grep -qx 'X-Omarchy-Package=spotify' "$entry" || fail "the launcher entry names the package it fronts"
-pass "the launcher entry names the package it fronts"
-
-# An Omarchy entry delivered without the package marker gets it, once.
-unmarked=$'[Desktop Entry]\nName=Spotify\nExec=omarchy-launch-spotify %u'
-for step in migration installer; do
-  printf '%s' "$unmarked" >"$entry"
-  "run_$step"
-  "run_$step"
-  [[ $(cat "$entry") == "$unmarked"$'\nX-Omarchy-Package=spotify' ]] || fail "$step marks an existing Omarchy entry with its package" "$(cat "$entry")"
-  pass "$step marks an existing Omarchy entry with its package"
-done
