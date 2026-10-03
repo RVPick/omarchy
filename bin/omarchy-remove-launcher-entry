@@ -63,6 +63,18 @@ is_user_desktop_file() {
   return 1
 }
 
+system_desktop_file() {
+  local dir
+
+  for dir in "${desktop_dirs[@]}"; do
+    [[ " ${user_desktop_dirs[*]} " == *" $dir "* ]] && continue
+    if [[ -f $dir/$desktop_file_name ]]; then
+      echo "$dir/$desktop_file_name"
+      return
+    fi
+  done
+}
+
 desktop_name="${desktop_file##*/}"
 desktop_name="${desktop_name%.desktop}"
 exec_line="$(sed -n 's/^Exec=//p' "$desktop_file" | head -1)"
@@ -81,7 +93,15 @@ if is_user_desktop_file; then
   display_name="${entry_name:-$desktop_name}"
   rm -f "$desktop_file"
   update-desktop-database "${desktop_file%/*}" &>/dev/null || true
-  exit 0
+
+  # A user entry that overrides a packaged app's own entry (an Omarchy launcher wrapper, say)
+  # stands for that app, so removing it uninstalls the package rather than unhiding its entry
+  shadowed_desktop_file="$(system_desktop_file)"
+  if [[ -n $shadowed_desktop_file ]] && pacman -Qqo "$shadowed_desktop_file" &>/dev/null; then
+    desktop_file="$shadowed_desktop_file"
+  else
+    exit 0
+  fi
 fi
 
 if package_name="$(pacman -Qqo "$desktop_file" 2>/dev/null | head -1)" && [[ -n $package_name ]]; then
